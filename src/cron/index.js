@@ -8,7 +8,7 @@ const getISTTime = () => {
     return DateTime.now().setZone('Asia/Kolkata');
 };
 
-const postToLinkedIn = async (text, id, accessToken) => {
+const postToLinkedIn = async (text, id, accessToken, image_id) => {
     try {
         // const formattedText = convertHtmlToPlainText(text);
         const body = {
@@ -19,7 +19,16 @@ const postToLinkedIn = async (text, id, accessToken) => {
                     shareCommentary: {
                         text: text
                     },
-                    shareMediaCategory: 'NONE'
+                    shareMediaCategory: image_id ? 'IMAGE' : 'NONE',
+                    media: image_id
+                        ? [
+                            {
+                                status: 'READY',
+                                media: `${image_id}`,
+                            }
+                        ]
+                        : []
+
                 }
             },
             visibility: {
@@ -167,7 +176,8 @@ const cronJob = async () => {
                 u.accessToken, 
                 u.uniid AS linkedin_id, 
                 s.time,
-                s.is_schedule
+                s.is_schedule,
+                p.image_id
             FROM posts p
             JOIN users u ON p.author = u.uniid
             LEFT JOIN slots s ON p.is_slot = s.id
@@ -182,7 +192,7 @@ const cronJob = async () => {
             `;
 
         for (const post of posts) {
-            const { post_id, content, accessToken, linkedin_id, is_slot, is_schedule, time } = post;
+            const { post_id, content, accessToken, linkedin_id, is_slot, image_id, time } = post;
 
             if (!accessToken || !linkedin_id) {
                 console.warn(`⚠️ Missing LinkedIn ID or token for post ${post_id}`);
@@ -198,7 +208,7 @@ const cronJob = async () => {
                 }
             }
 
-            const response = await postToLinkedIn(content || 'Default post content', linkedin_id, accessToken);
+            const response = await postToLinkedIn(content || 'Default post content', linkedin_id, accessToken,image_id);
             if (response) {
                 await prisma.$executeRaw`UPDATE posts SET is_post = 1 WHERE id = ${post_id}`;
                 console.log(`✅ Posted to LinkedIn: post ${post_id}`);
